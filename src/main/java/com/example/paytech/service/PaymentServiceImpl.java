@@ -1,11 +1,12 @@
 package com.example.paytech.service;
 
+import com.example.paytech.dto.CustomerProperties;
+import com.example.paytech.dto.PaymentProperties;
 import com.example.paytech.dto.PaymentRequest;
 import com.example.paytech.dto.PaymentResponse;
-import com.example.paytech.entity.Customer;
-import java.math.BigDecimal;
+import com.example.paytech.dto.PaytechApiProperties;
+import com.example.paytech.mappers.PaymentMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -16,46 +17,19 @@ import org.springframework.web.client.RestTemplate;
 @Service
 public class PaymentServiceImpl implements PaymentService {
 
-  @Value("${paytech.api.url}")
-  private String apiUrl;
-
-  @Value("${paytech.api.token}")
-  private String apiToken;
-
-  @Value("${payment.currency}")
-  private String currency;
-
-  @Value("${payment.paymentType}")
-  private String paymentType;
-
-  @Value("${customer.email}")
-  private String email;
-
-  @Value("${customer.phone}")
-  private String phone;
-
-  @Value("${customer.referenceId}")
-  private String referenceId;
-
-  @Value("${customer.firstName}")
-  private String firstName;
-
-  @Value("${customer.lastName}")
-  private String lastName;
-
-  @Value("${customer.citizenshipCountryCode}")
-  private String citizenshipCountryCode;
-
-  @Value("${customer.dateOfBirth}")
-  private String dateOfBirth;
-
-  @Value("${customer.locale}")
-  private String locale;
-
-
+  private final PaytechApiProperties paytechApiProperties;
+  private final PaymentProperties paymentProperties;
+  private final CustomerProperties customerProperties;
+  private final PaymentMapper paymentMapper;
   private final RestTemplate restTemplate;
 
-  public PaymentServiceImpl(RestTemplate restTemplate) {
+  public PaymentServiceImpl(PaytechApiProperties paytechApiProperties,
+      PaymentProperties paymentProperties, CustomerProperties customerProperties,
+      PaymentMapper paymentMapper, RestTemplate restTemplate) {
+    this.paytechApiProperties = paytechApiProperties;
+    this.paymentProperties = paymentProperties;
+    this.customerProperties = customerProperties;
+    this.paymentMapper = paymentMapper;
     this.restTemplate = restTemplate;
   }
 
@@ -63,41 +37,25 @@ public class PaymentServiceImpl implements PaymentService {
   public PaymentResponse createPayment(PaymentRequest paymentRequest) {
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
-    headers.set("Authorization", "Bearer " + apiToken);
+    headers.set("Authorization", "Bearer " + paytechApiProperties.getToken());
     headers.set("accept", MediaType.APPLICATION_JSON_VALUE);
 
     HttpEntity<PaymentRequest> request = new HttpEntity<>(paymentRequest, headers);
-    return restTemplate.postForObject(apiUrl + "/payments", request, PaymentResponse.class);
+    return restTemplate.postForObject(paytechApiProperties.getUrl() + "/payments", request,
+        PaymentResponse.class);
   }
 
   @Override
   public String processPayment(double amount) {
-    PaymentRequest paymentRequest = new PaymentRequest();
-    paymentRequest.setAmount(BigDecimal.valueOf(amount));
-    paymentRequest.setCurrency(currency);
-    paymentRequest.setPaymentType(paymentType);
-
-    Customer customer = new Customer();
-    customer.setEmail(email);
-    customer.setPhone(phone);
-    customer.setReferenceId(referenceId);
-    customer.setFirstName(firstName);
-    customer.setLastName(lastName);
-    customer.setCitizenshipCountryCode(citizenshipCountryCode);
-    customer.setDateOfBirth(dateOfBirth);
-    customer.setLocale(locale);
-    paymentRequest.setCustomer(customer);
+    CustomerProperties customer = paymentMapper.mapToCustomer(customerProperties.getEmail(),
+        customerProperties.getPhone(), customerProperties.getReferenceId(),
+        customerProperties.getFirstName(), customerProperties.getLastName(),
+        customerProperties.getCitizenshipCountryCode(), customerProperties.getDateOfBirth(),
+        customerProperties.getLocale());
+    PaymentRequest paymentRequest = paymentMapper.mapToPaymentRequest(amount,
+        paymentProperties.getCurrency(), paymentProperties.getPaymentType(), customer);
 
     PaymentResponse paymentResponse = createPayment(paymentRequest);
-    if (paymentResponse != null) {
-      log.info(paymentResponse.toString());
-    }
-
-    if (paymentResponse != null && paymentResponse.getResult() != null
-        && paymentResponse.getResult().getRedirectUrl() != null) {
-      return "redirect:" + paymentResponse.getResult().getRedirectUrl();
-    } else {
-      return "error";
-    }
+    return "redirect:" + paymentResponse.getResult().getRedirectUrl();
   }
 }

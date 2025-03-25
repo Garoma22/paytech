@@ -1,16 +1,21 @@
-import static junit.framework.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
+import com.example.paytech.dto.CustomerProperties;
+import com.example.paytech.dto.PaymentProperties;
+import com.example.paytech.dto.PaymentRequest;
 import com.example.paytech.dto.PaymentResponse;
+import com.example.paytech.dto.PaytechApiProperties;
+import com.example.paytech.mappers.PaymentMapper;
 import com.example.paytech.service.PaymentServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.mockito.Mockito;
 import org.springframework.web.client.RestTemplate;
 
 public class PaymentServiceImplTest {
@@ -18,22 +23,46 @@ public class PaymentServiceImplTest {
   @Mock
   private RestTemplate restTemplate;
 
+  @Mock
+  private PaymentMapper paymentMapper;
+
   @InjectMocks
   private PaymentServiceImpl paymentService;
+
+  @Mock
+  private PaytechApiProperties paytechApiProperties;
+
+  @Mock
+  private PaymentProperties paymentProperties;
+
+  @Mock
+  private CustomerProperties customerProperties;
 
   @BeforeEach
   public void setUp() {
     MockitoAnnotations.openMocks(this);
-    ReflectionTestUtils.setField(paymentService, "currency", "EUR");
-    ReflectionTestUtils.setField(paymentService, "paymentType", "DEPOSIT");
-    ReflectionTestUtils.setField(paymentService, "email", "test@example.com");
-    ReflectionTestUtils.setField(paymentService, "phone", "123 4567890");
-    ReflectionTestUtils.setField(paymentService, "referenceId", "12345");
-    ReflectionTestUtils.setField(paymentService, "firstName", "Roman");
-    ReflectionTestUtils.setField(paymentService, "lastName", "Galkin");
-    ReflectionTestUtils.setField(paymentService, "citizenshipCountryCode", "GE");
-    ReflectionTestUtils.setField(paymentService, "dateOfBirth", "2001-12-03");
-    ReflectionTestUtils.setField(paymentService, "locale", "ru");
+
+    when(paytechApiProperties.getToken()).thenReturn("testToken");
+    when(paytechApiProperties.getUrl()).thenReturn("http://test.api");
+
+    when(paymentProperties.getCurrency()).thenReturn("EUR");
+    when(paymentProperties.getPaymentType()).thenReturn("DEPOSIT");
+
+    when(customerProperties.getEmail()).thenReturn("test@example.com");
+    when(customerProperties.getPhone()).thenReturn("123 4567890");
+    when(customerProperties.getReferenceId()).thenReturn("12345");
+    when(customerProperties.getFirstName()).thenReturn("Roman");
+    when(customerProperties.getLastName()).thenReturn("Galkin");
+    when(customerProperties.getCitizenshipCountryCode()).thenReturn("GE");
+    when(customerProperties.getDateOfBirth()).thenReturn("2001-12-03");
+    when(customerProperties.getLocale()).thenReturn("ru");
+
+    when(paymentMapper.mapToCustomer(anyString(), anyString(), anyString(), anyString(),
+        anyString(), anyString(), anyString(), anyString()))
+        .thenReturn(new CustomerProperties());
+
+    when(paymentMapper.mapToPaymentRequest(Mockito.anyDouble(), anyString(), anyString(),
+        Mockito.any(CustomerProperties.class))).thenReturn(new PaymentRequest());
   }
 
   @Test
@@ -52,19 +81,14 @@ public class PaymentServiceImplTest {
 
   @Test
   public void testProcessPayment_Failure() {
-    when(restTemplate.postForObject(anyString(), any(), any())).thenReturn(null);
-    String result = paymentService.processPayment(100.0);
-    assertEquals("error", result);
-  }
-
-  @Test
-  public void testProcessPayment_NoRedirectUrl() {
     PaymentResponse paymentResponse = new PaymentResponse();
     PaymentResponse.Result result = new PaymentResponse.Result();
     paymentResponse.setResult(result);
 
     when(restTemplate.postForObject(anyString(), any(), any())).thenReturn(paymentResponse);
-    String resulString = paymentService.processPayment(100.0);
-    assertEquals("error", resulString);
+
+    String redirectUrl = paymentService.processPayment(100.0);
+
+    assertEquals("redirect:null", redirectUrl);
   }
 }

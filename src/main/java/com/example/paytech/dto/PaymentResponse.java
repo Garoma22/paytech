@@ -1,6 +1,5 @@
 package com.example.paytech.dto;
 
-import com.example.paytech.entity.Customer;
 import lombok.Data;
 
 @Data
@@ -16,6 +15,6 @@ public class PaymentResponse {
     private int amount;
     private String currency;
     private String redirectUrl;
-    private Customer customer;
+    private CustomerProperties customer;
   }
 }
